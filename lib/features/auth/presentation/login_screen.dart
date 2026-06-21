@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/constants/app_colors.dart';
 import '../providers/auth_provider.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class LoginScreen extends ConsumerWidget {
   const LoginScreen({super.key});
@@ -41,6 +43,13 @@ class LoginScreen extends ConsumerWidget {
                 isLoading: isLoading,
                 onPressed: () => ref.read(authStatusProvider.notifier).loginWithGoogle(),
               ),
+              if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+                const SizedBox(height: 12),
+                _AppleButton(
+                  isLoading: isLoading,
+                  onPressed: () => ref.read(authStatusProvider.notifier).loginWithApple(),
+                ),
+              ],
               const SizedBox(height: 16),
               const Text(
                 'Ao continuar você concorda com os\nTermos de Uso e Política de Privacidade',
@@ -101,6 +110,46 @@ class _GoogleButton extends StatelessWidget {
                   SizedBox(width: 12),
                   Text(
                     'Continuar com Google',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _AppleButton extends StatelessWidget {
+  final bool isLoading;
+  final VoidCallback onPressed;
+
+  const _AppleButton({required this.isLoading, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: OutlinedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: AppColors.border),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+          backgroundColor: AppColors.surface,
+        ),
+        child: isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryPurple),
+              )
+            : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.apple, size: 22, color: AppColors.textPrimary),
+                  SizedBox(width: 10),
+                  Text(
+                    'Continuar com Apple',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
                   ),
                 ],

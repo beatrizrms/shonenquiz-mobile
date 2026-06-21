@@ -115,19 +115,11 @@ class _AnimeSelectionScreenState extends ConsumerState<AnimeSelectionScreen> {
                   ),
                 ),
                 data: (animes) {
-                  final fixed    = animes.where((a) => a.isFixed).toList();
-                  final nonFixed = animes.where((a) => !a.isFixed).toList();
-
-                  if (selected.isEmpty) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      ref.read(selectedAnimesProvider.notifier).state =
-                          fixed.map((a) => a.id).toSet();
-                    });
-                  }
+                  final allAnimes = animes.toList();
 
                   final filtered = _search.isEmpty
-                      ? nonFixed
-                      : nonFixed.where((a) => a.name.toLowerCase().contains(_search.toLowerCase())).toList();
+                      ? allAnimes
+                      : allAnimes.where((a) => a.name.toLowerCase().contains(_search.toLowerCase())).toList();
 
                   final byCategory = <String, List<AnimeModel>>{};
                   for (final a in filtered) {
@@ -147,8 +139,6 @@ class _AnimeSelectionScreenState extends ConsumerState<AnimeSelectionScreen> {
                               controller: _searchController,
                               onChanged: (v) => setState(() => _search = v),
                             ),
-                            const SizedBox(height: 16),
-                            _FixedSection(animes: fixed, selected: selected),
                             const SizedBox(height: 8),
                           ],
                         ),
@@ -296,35 +286,6 @@ class _SearchBar extends StatelessWidget {
   }
 }
 
-// ── Fixed section ──────────────────────────────────────────────
-class _FixedSection extends StatelessWidget {
-  final List<AnimeModel> animes;
-  final Set<String> selected;
-  const _FixedSection({required this.animes, required this.selected});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Icon(Icons.push_pin, size: 12, color: AppColors.amber),
-            SizedBox(width: 4),
-            Text('SEMPRE ATIVOS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.amber, letterSpacing: .1)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: animes.map((a) => _AnimePill(name: a.name, isSelected: true, isFixed: true, onTap: () {})).toList(),
-        ),
-      ],
-    );
-  }
-}
-
 // ── Category section ───────────────────────────────────────────
 class _CategorySection extends StatelessWidget {
   final String label;
@@ -384,7 +345,6 @@ class _CategorySection extends StatelessWidget {
               children: animes.map((a) => _AnimePill(
                 name: a.name,
                 isSelected: selected.contains(a.id),
-                isFixed: false,
                 onTap: () => onToggleAnime(a.id),
               )).toList(),
             ),
@@ -399,15 +359,14 @@ class _CategorySection extends StatelessWidget {
 class _AnimePill extends StatelessWidget {
   final String name;
   final bool isSelected;
-  final bool isFixed;
   final VoidCallback onTap;
 
-  const _AnimePill({required this.name, required this.isSelected, required this.isFixed, required this.onTap});
+  const _AnimePill({required this.name, required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: isFixed ? null : onTap,
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
@@ -438,10 +397,7 @@ class _BottomBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final animesAsync  = ref.watch(allAnimesProvider);
-    final fixedCount   = animesAsync.valueOrNull?.where((a) => a.isFixed).length ?? 3;
-    final nonFixed     = selected.length - fixedCount;
-    final canProceed   = nonFixed >= 5;
+    final canProceed   = selected.length >= 3;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
@@ -452,9 +408,12 @@ class _BottomBar extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Selecionados', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               Text(
-                '${nonFixed < 0 ? 0 : nonFixed} animes',
+                canProceed ? 'Selecionados' : 'Escolha pelo menos 3 animes',
+                style: TextStyle(fontSize: 12, color: canProceed ? AppColors.textSecondary : AppColors.amber),
+              ),
+              Text(
+                '${selected.length} animes',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: canProceed ? AppColors.success : AppColors.textSecondary),
               ),
             ],
@@ -474,21 +433,6 @@ class _BottomBar extends ConsumerWidget {
                   : Text(isEditing ? 'Salvar' : 'Continuar', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             ),
           ),
-          if (!isEditing) ...[
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton(
-              onPressed: onNext,
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.border),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
-              ),
-              child: const Text('Pular por agora', style: TextStyle(fontSize: 15, color: AppColors.textSecondary)),
-            ),
-          ),
-          ],
         ],
       ),
     );

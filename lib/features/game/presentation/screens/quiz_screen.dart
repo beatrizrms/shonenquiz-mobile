@@ -4,6 +4,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/audio_manager.dart';
+import '../../../../core/services/game_sound_controller.dart';
 import '../../../../core/services/sound_service.dart';
 import '../../../../core/widgets/cat_avatar_view.dart';
 import '../../../avatar/data/ability_slot_repository.dart';
@@ -26,19 +28,19 @@ class QuizScreen extends ConsumerStatefulWidget {
 }
 
 class _QuizScreenState extends ConsumerState<QuizScreen> {
-  late SoundService _sound;
-  Timer? _timesUpPlayTimer;
-  Timer? _timesUpStopTimer;
-  bool _timerLowActive = false;
+  late GameSoundController _gameAudio;
 
   @override
   void initState() {
     super.initState();
-    _sound = ref.read(soundServiceProvider);
+    _gameAudio = GameSoundController(
+      audio: ref.read(audioManagerProvider),
+      sound: ref.read(soundServiceProvider),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(gameProvider.notifier).startSession(mode: widget.mode);
-      _sound.playBackground(BackgroundMusic.classico);
+      _gameAudio.activate(widget.mode);
     });
   }
 
@@ -54,11 +56,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
   @override
   void dispose() {
-    _timesUpPlayTimer?.cancel();
-    _timesUpStopTimer?.cancel();
-    _timerLowActive = false;
-    _sound.stopAllEffects();
-    _sound.stopBackground();
+    _gameAudio.dispose();
     super.dispose();
   }
 
@@ -76,63 +74,16 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
         s.lastResult!.currentCombo >= 2
             ? s.lastResult!.currentCombo
             : 0));
-    final sound = ref.read(soundServiceProvider);
-
     // Timer low sound + navegação para game over / vitória
     ref.listen(gameProvider, (prev, next) {
       if (!mounted) return;
-
-      // ── timerLow: para em qualquer situação que invalide o "alerta de tempo" ──
-      final questionChanged = next.phase == GamePhase.question &&
-          prev?.phase == GamePhase.question &&
-          prev?.currentQuestion?.id != next.currentQuestion?.id;
-      final timeExtended = next.phase == GamePhase.question &&
-          (prev?.secondsLeft ?? 0) < next.secondsLeft;
-
-      if ((questionChanged || timeExtended) && _timerLowActive) {
-        sound.stop(GameSound.timerLow);
-        _timerLowActive = false;
-      }
-
-      // Inicia timerLow ao chegar em 8s (uma vez por "zona de baixo tempo")
-      if (next.phase == GamePhase.question &&
-          next.secondsLeft == 8 &&
-          (prev?.secondsLeft ?? 9) > 8 &&
-          !_timerLowActive) {
-        sound.playLoop(GameSound.timerLow);
-        _timerLowActive = true;
-      }
-
-      // Para timerLow quando a resposta é submetida (question → answerReveal)
-      if (prev?.phase == GamePhase.question && next.phase == GamePhase.answerReveal) {
-        if (_timerLowActive) {
-          sound.stop(GameSound.timerLow);
-          _timerLowActive = false;
-        }
-        if (next.isTimeOut) {
-          _timesUpPlayTimer = Timer(const Duration(milliseconds: 1500), () async {
-            if (!mounted) return;
-            await sound.play(GameSound.timesUp);
-            _timesUpStopTimer = Timer(const Duration(milliseconds: 1500), () => sound.stop(GameSound.timesUp));
-          });
-        }
-      }
-
+      _gameAudio.onGameStateChanged(prev, next);
       if (prev?.phase == next.phase) return;
-      if (next.phase == GamePhase.gameOver || next.phase == GamePhase.victory) {
-        _timesUpPlayTimer?.cancel();
-        _timesUpStopTimer?.cancel();
-        _timerLowActive = false;
-        sound.stopAllEffects();
-        sound.stopBackground();
-      }
       if (next.phase == GamePhase.gameOver) {
-        sound.play(GameSound.gameOver);
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => GameOverScreen(summary: next.summary, score: next.score, lives: next.lives)),
         );
       } else if (next.phase == GamePhase.victory) {
-        sound.play(GameSound.victory);
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => VictoryScreen(score: next.score, questionsAnswered: next.questionsAnswered, questionsTotal: next.questionsTotal, lastResult: next.lastResult, sessionId: next.sessionId)),
         );
@@ -195,7 +146,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             const _CoinProgressPanel(),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
+                padding: EdgeInsets.fromLTRB(14, _compact(context) ? 8 : 12, 14, _compact(context) ? 10 : 16),
                 child: Column(
                   children: [
                     _QuestionCard(question: question),
@@ -203,7 +154,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
                     _OptionsGrid(
                       onSelect: (optionId) => ref.read(gameProvider.notifier).submitAnswer(optionId),
                       onNext: () {
-                        sound.play(GameSound.click);
+                        _gameAudio.onButtonTap();
                         ref.read(gameProvider.notifier).advanceToNextQuestion();
                       },
                     ),
@@ -214,7 +165,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             if (comboCombo >= 2)
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-                child: _ComboBanner(combo: comboCombo, sound: sound),
+                child: _ComboBanner(combo: comboCombo, onPlay: _gameAudio.onCombo),
               ),
             const _BossEffectBanner(),
             const _AbilityBar(),
@@ -228,6 +179,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     );
   }
 }
+
+bool _compact(BuildContext context) => MediaQuery.of(context).size.height < 680;
 
 Color _diffPhaseColor(String d) => switch (d) {
   'impossible' => const Color(0xFF9B30FF),
@@ -291,8 +244,9 @@ class _TopBarState extends ConsumerState<_TopBar> with TickerProviderStateMixin 
     final combo             = ref.watch(gameProvider.select((s) => s.combo));
     final difficulty        = ref.watch(gameProvider.select((s) => s.currentQuestion?.difficulty ?? 'easy'));
 
+    final compact = _compact(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+      padding: EdgeInsets.fromLTRB(14, compact ? 6 : 10, 14, compact ? 2 : 4),
       child: Row(
         children: [
           // Vidas — corações animados
@@ -562,7 +516,7 @@ class _QuestionCardState extends ConsumerState<_QuestionCard> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(_compact(context) ? 12 : 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
@@ -1039,7 +993,7 @@ class _OptionsGridState extends ConsumerState<_OptionsGrid> {
             child: Container(
               width: double.infinity,
               margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: _compact(context) ? 10 : 14),
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: BorderRadius.circular(13),
@@ -1138,7 +1092,10 @@ class _OptionsGridState extends ConsumerState<_OptionsGrid> {
         // Botão próxima após reveal
         if (isReveal && result != null && result.isActive) ...[
           const SizedBox(height: 8),
-          isTimeOut ? const _TimeOutBanner() : _ResultBanner(result: result, sound: sound),
+          isTimeOut ? const _TimeOutBanner() : _ResultBanner(
+            result: result,
+            onPlay: () => sound.play(result.isCorrect ? GameSound.correct : GameSound.wrong),
+          ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -1184,8 +1141,8 @@ class _TimeOutBanner extends StatelessWidget {
 
 class _ResultBanner extends StatefulWidget {
   final AnswerResult result;
-  final SoundService sound;
-  const _ResultBanner({required this.result, required this.sound});
+  final VoidCallback onPlay;
+  const _ResultBanner({required this.result, required this.onPlay});
 
   @override
   State<_ResultBanner> createState() => _ResultBannerState();
@@ -1195,7 +1152,7 @@ class _ResultBannerState extends State<_ResultBanner> {
   @override
   void initState() {
     super.initState();
-    widget.sound.play(widget.result.isCorrect ? GameSound.correct : GameSound.wrong);
+    widget.onPlay();
   }
 
   @override
@@ -1246,8 +1203,9 @@ class _CoinProgressPanel extends ConsumerWidget {
     final end = (start + 4).clamp(4, 15);
     final stages = List.generate(end - start + 1, (i) => start + i);
 
+    final compact = _compact(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: compact ? 5 : 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.border)),
@@ -1338,8 +1296,8 @@ class _CoinProgressPanel extends ConsumerWidget {
 
 class _ComboBanner extends StatefulWidget {
   final int combo;
-  final SoundService sound;
-  const _ComboBanner({required this.combo, required this.sound});
+  final VoidCallback onPlay;
+  const _ComboBanner({required this.combo, required this.onPlay});
 
   @override
   State<_ComboBanner> createState() => _ComboBannerState();
@@ -1367,7 +1325,7 @@ class _ComboBannerState extends State<_ComboBanner> with TickerProviderStateMixi
       setState(() => _visible = true);
       _entryCtrl.forward();
       _haloCtrl.forward();
-      widget.sound.play(GameSound.combo);
+      widget.onPlay();
     });
   }
 
@@ -1483,6 +1441,7 @@ class _AbilityBar extends ConsumerWidget {
     final isActive   = phase == GamePhase.question;
     final bossEffect = ref.watch(gameProvider.select((s) => s.activeBoss?.effectType));
     final abilitiesBlocked = bossEffect == 'cancel_active_help';
+    final compact = _compact(context);
 
     // Mostra sempre 4 slots (índice 0–3)
     final slotWidgets = List.generate(4, (i) {
@@ -1511,7 +1470,7 @@ class _AbilityBar extends ConsumerWidget {
             opacity: disabled ? 0.35 : 1.0,
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 4),
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: EdgeInsets.symmetric(vertical: compact ? 5 : 8),
               decoration: BoxDecoration(
                 color: isOnCooldown ? AppColors.surface : (disabled ? AppColors.surface : AppColors.surfaceElevated),
                 borderRadius: BorderRadius.circular(10),
@@ -1555,7 +1514,7 @@ class _AbilityBar extends ConsumerWidget {
     });
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      padding: EdgeInsets.fromLTRB(10, compact ? 3 : 6, 10, compact ? 3 : 6),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: AppColors.border)),
         color: AppColors.background,
@@ -1607,7 +1566,7 @@ class _BottomBar extends ConsumerWidget {
     final score = ref.watch(gameProvider.select((s) => s.score));
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+      padding: EdgeInsets.fromLTRB(14, _compact(context) ? 5 : 8, 14, _compact(context) ? 8 : 12),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: AppColors.border)),
         color: AppColors.background,

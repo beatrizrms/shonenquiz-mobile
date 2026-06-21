@@ -23,6 +23,14 @@ class AuthNotifier extends AsyncNotifier<AuthStatus> {
     });
   }
 
+  Future<void> loginWithApple() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await ref.read(authRepositoryProvider).loginWithApple();
+      return AuthStatus.authenticated;
+    });
+  }
+
   Future<void> logout() async {
     state = const AsyncValue.loading();
     await ref.read(authRepositoryProvider).logout();

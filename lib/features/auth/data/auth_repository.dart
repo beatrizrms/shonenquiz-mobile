@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/dio_client.dart';
 import 'auth_model.dart';
@@ -40,6 +41,29 @@ class AuthRepository {
     } on DioException catch (e) {
       throw ApiException(
         e.response?.data?['message'] as String? ?? 'Erro ao autenticar',
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<void> loginWithApple() async {
+    final credential = await SignInWithApple.getAppleIDCredential(
+      scopes: [
+        AppleIDAuthorizationScopes.email,
+        AppleIDAuthorizationScopes.fullName,
+      ],
+    );
+
+    final identityToken = credential.identityToken;
+    if (identityToken == null) throw const ApiException('Token Apple inválido');
+
+    try {
+      final res = await _dio.post('/auth/apple', data: {'identityToken': identityToken});
+      final tokens = AuthTokens.fromJson(res.data as Map<String, dynamic>);
+      await _persistTokens(tokens);
+    } on DioException catch (e) {
+      throw ApiException(
+        e.response?.data?['message'] as String? ?? 'Erro ao autenticar com Apple',
         statusCode: e.response?.statusCode,
       );
     }

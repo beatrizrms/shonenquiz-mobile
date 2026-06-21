@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/services/sound_service.dart';
+import '../../../core/services/audio_manager.dart';
+import '../../friends/presentation/friends_screen.dart';
 import '../../home/presentation/home_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../ranking/presentation/ranking_screen.dart';
@@ -26,17 +27,17 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   void dispose() {
-    ref.read(soundServiceProvider).stopBackground();
+    ref.read(audioManagerProvider).onLeaveMenu();
     super.dispose();
   }
 
   Future<void> _onTabChanged(int index) async {
     ref.read(_tabIndexProvider.notifier).state = index;
-    final sound = ref.read(soundServiceProvider);
+    final audio = ref.read(audioManagerProvider);
     if (index == 0) {
-      await sound.stopBackground();
+      await audio.onLeaveMenu();
     } else {
-      await sound.playBackground(BackgroundMusic.menu);
+      await audio.onEnterMenu();
     }
   }
 
@@ -51,6 +52,7 @@ class _MainShellState extends ConsumerState<MainShell> {
         children: const [
           HomeScreen(),
           RankingScreen(),
+          FriendsScreen(),
           ProfileScreen(),
           ShopScreen(),
         ],
@@ -79,6 +81,7 @@ class _BottomNav extends StatelessWidget {
   static const _items = [
     (Icons.home_outlined,        Icons.home,             'Home'),
     (Icons.leaderboard_outlined, Icons.leaderboard,      'Ranking'),
+    (Icons.people_outline,       Icons.people,           'Amigos'),
     (Icons.person_outline,       Icons.person,           'Perfil'),
     (Icons.storefront_outlined,  Icons.storefront,       'Loja'),
   ];

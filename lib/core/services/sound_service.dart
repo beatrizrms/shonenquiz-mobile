@@ -18,7 +18,7 @@ enum GameSound {
 enum BackgroundMusic {
   classico,      // sounds/background_classico.wav
   sobrevivencia, // sounds/background_sobrevivencia.mp3
-  menu,          // sounds/menu.wav
+  menu,          // sounds/menu.mp3
 }
 
 const _effectFiles = {
@@ -38,7 +38,7 @@ const _effectFiles = {
 const _musicFiles = {
   BackgroundMusic.classico:      'sounds/background_classico.wav',
   BackgroundMusic.sobrevivencia: 'sounds/background_sobrevivencia.mp3',
-  BackgroundMusic.menu:          'sounds/menu.wav',
+  BackgroundMusic.menu:          'sounds/menu.mp3',
 };
 
 class SoundService {
@@ -47,29 +47,10 @@ class SoundService {
 
   // Player dedicado para música de fundo — nunca misturado com efeitos
   AudioPlayer? _bgPlayer;
-  BackgroundMusic? _currentBg;
 
   AudioPlayer get _bg {
-    if (_bgPlayer != null) return _bgPlayer!;
-    final player = AudioPlayer(playerId: 'background');
-    // Contexto isolado: playback + mixWithOthers garante que o background
-    // nunca seja interrompido por efeitos sonoros do próprio app.
-    player.setAudioContext(AudioContext(
-      android: AudioContextAndroid(
-        audioFocus: AndroidAudioFocus.none,
-        isSpeakerphoneOn: false,
-        stayAwake: false,
-        contentType: AndroidContentType.music,
-        usageType: AndroidUsageType.game,
-        audioMode: AndroidAudioMode.normal,
-      ),
-      iOS: AudioContextIOS(
-        category: AVAudioSessionCategory.playback,
-        options: {AVAudioSessionOptions.mixWithOthers},
-      ),
-    ));
-    _bgPlayer = player;
-    return player;
+    _bgPlayer ??= AudioPlayer(playerId: 'background');
+    return _bgPlayer!;
   }
 
   bool _muted = false;
@@ -120,17 +101,13 @@ class SoundService {
 
   Future<void> playBackground(BackgroundMusic music) async {
     if (_muted) return;
-    _currentBg = music;
-    final source = AssetSource(_musicFiles[music]!);
     await _bg.stop();
     await _bg.setReleaseMode(ReleaseMode.loop);
     await _bg.setVolume(0.7);
-    await _bg.setSource(source);
-    await _bg.resume();
+    await _bg.play(AssetSource(_musicFiles[music]!));
   }
 
   Future<void> stopBackground() async {
-    _currentBg = null;
     await _bgPlayer?.stop();
   }
 

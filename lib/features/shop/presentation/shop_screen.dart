@@ -327,16 +327,19 @@ class _AcessoriosTabState extends ConsumerState<_AcessoriosTab> {
             loading: () => const [Padding(padding: EdgeInsets.only(top: 40), child: Center(child: CircularProgressIndicator(color: AppColors.primaryPurple)))],
             error: (e, _) => const [Padding(padding: EdgeInsets.only(top: 40), child: Center(child: Text('Falha ao carregar acessórios', style: TextStyle(color: AppColors.textSecondary))))],
             data: (items) {
-              var filtered = items.where((i) {
-                final matchQuery = _query.isEmpty || i.name.toLowerCase().contains(_query);
-                final matchSet = _filterSet == null || i.setRef == _filterSet;
-                return matchQuery && matchSet;
-              }).toList();
-
-              // Resolve o nome do set de cada item para exibir no card
+              // Resolve o nome do set antes do filtro para poder buscar por personagem
               final setNames = <String, String>{
                 for (final s in sets) s.itemRef: s.name,
               };
+
+              var filtered = items.where((i) {
+                final setName = i.setRef != null ? (setNames[i.setRef] ?? '') : '';
+                final matchQuery = _query.isEmpty ||
+                    i.name.toLowerCase().contains(_query) ||
+                    setName.toLowerCase().contains(_query);
+                final matchSet = _filterSet == null || i.setRef == _filterSet;
+                return matchQuery && matchSet;
+              }).toList();
 
               if (filtered.isEmpty) {
                 return const [Padding(padding: EdgeInsets.only(top: 40), child: Center(child: Text('Nenhum acessório encontrado', style: TextStyle(color: AppColors.textSecondary))))];

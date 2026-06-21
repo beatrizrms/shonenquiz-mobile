@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../friends/providers/friends_provider.dart';
 import '../../profile/data/user_profile.dart';
 import '../../profile/providers/profile_provider.dart';
 import '../data/ranking_repository.dart';
@@ -86,7 +87,7 @@ class _RankingScreenState extends ConsumerState<RankingScreen> with SingleTicker
                 controller: _tab,
                 children: [
                   _GlobalTab(profile: profile),
-                  const _ComingSoon('Adicione amigos para ver o ranking aqui', '👥'),
+                  _FriendsTab(profile: profile),
                   _LeagueTab(profile: profile),
                 ],
               ),
@@ -547,6 +548,31 @@ class _ErrorState extends StatelessWidget {
           TextButton(onPressed: onRetry, child: const Text('Tentar novamente', style: TextStyle(color: AppColors.primaryPurple))),
         ],
       ),
+    );
+  }
+}
+
+// ── Aba de ranking de amigos ──────────────────────────────────────────────────
+
+class _FriendsTab extends ConsumerWidget {
+  final UserProfile? profile;
+  const _FriendsTab({this.profile});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(friendRankingProvider);
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primaryPurple)),
+      error: (_, __) => Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Falha ao carregar', style: TextStyle(color: AppColors.textSecondary)),
+          const SizedBox(height: 12),
+          ElevatedButton(onPressed: () => ref.invalidate(friendRankingProvider), child: const Text('Tentar novamente')),
+        ]),
+      ),
+      data: (entries) => entries.isEmpty
+          ? const _ComingSoon('Adicione amigos para ver o ranking aqui', '👥')
+          : _RankingList(result: RankingResult(season: null, entries: entries, currentUserEntry: entries.firstWhere((e) => e.isCurrentUser, orElse: () => entries.first))),
     );
   }
 }
