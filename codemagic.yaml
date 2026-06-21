@@ -10,7 +10,7 @@ workflows:
       events:
         - push
       branch_patterns:
-        - pattern: develop
+        - pattern: staging
           include: true
 
     environment:
