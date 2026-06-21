@@ -87,6 +87,7 @@ class _VictoryScreenState extends ConsumerState<VictoryScreen>
     final xp = widget.lastResult?.xpEarned ?? 0;
     final coins = widget.lastResult?.nekocoinsEarned ?? 0;
     final combo = widget.lastResult?.currentCombo ?? 0;
+    final dailyGem = widget.lastResult?.dailyWinGemEarned ?? false;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0a1a0e),
@@ -166,6 +167,10 @@ class _VictoryScreenState extends ConsumerState<VictoryScreen>
                     if (combo >= 2) ...[
                       const SizedBox(height: 10),
                       _RewardRow('Maior combo', '×$combo 🔥', AppColors.green),
+                    ],
+                    if (dailyGem) ...[
+                      const SizedBox(height: 10),
+                      _RewardRow('Vitória diária', '+1 💎', AppColors.lightPurple),
                     ],
                   ],
                 ),

@@ -1,3 +1,7 @@
+# Environment configs (adicione ao .gitignore se tiver secrets)
+# env.local.json
+# env.homolog.json
+
 # Miscellaneous
 *.class
 *.log

@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Local (emulador Android)",
+      "request": "launch",
+      "type": "dart",
+      "args": ["--dart-define-from-file=env.local.json"]
+    },
+    {
+      "name": "Homolog (device físico)",
+      "request": "launch",
+      "type": "dart",
+      "args": ["--dart-define-from-file=env.homolog.json"]
+    }
+  ]
+}

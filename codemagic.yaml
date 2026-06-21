@@ -1,0 +1,92 @@
+workflows:
+
+  # ── Homolog: push na develop → TestFlight ──────────────────────────────────
+  ios-homolog:
+    name: iOS Homolog → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: staging
+          include: true
+
+    environment:
+      flutter: stable
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.shonenquiz.app
+      vars:
+        APP_STORE_CONNECT_ISSUER_ID: Encrypted(...)   # preencher no painel
+        APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...)
+        APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...)
+        CERTIFICATE_PRIVATE_KEY: Encrypted(...)
+        API_BASE_URL: https://shonenquiz-api-1.onrender.com
+
+    scripts:
+      - name: Install dependencies
+        script: flutter pub get
+
+      - name: Build IPA
+        script: |
+          flutter build ipa \
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --export-options-plist=$CM_EXPORT_OPTIONS_PATH
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - App Store Connect Users
+
+  # ── Produção: push na main → App Store ─────────────────────────────────────
+  ios-production:
+    name: iOS Produção → App Store
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+
+    environment:
+      flutter: stable
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.shonenquiz.app
+      vars:
+        APP_STORE_CONNECT_ISSUER_ID: Encrypted(...)   # mesmas chaves do homolog
+        APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...)
+        APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...)
+        CERTIFICATE_PRIVATE_KEY: Encrypted(...)
+        API_BASE_URL: https://shonenquiz-api-1.onrender.com   # trocar pela URL de prod quando tiver
+
+    scripts:
+      - name: Install dependencies
+        script: flutter pub get
+
+      - name: Build IPA
+        script: |
+          flutter build ipa \
+            --dart-define=API_BASE_URL=$API_BASE_URL \
+            --export-options-plist=$CM_EXPORT_OPTIONS_PATH
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: true
