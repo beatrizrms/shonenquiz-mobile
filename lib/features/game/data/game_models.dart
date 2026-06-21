@@ -163,6 +163,7 @@ class AnswerResult {
   final Question? nextQuestion;
   final BossEncounter? upcomingBoss;
   final String? activeBossEffect;
+  final bool dailyWinGemEarned;
 
   const AnswerResult({
     required this.isCorrect,
@@ -182,6 +183,7 @@ class AnswerResult {
     this.nextQuestion,
     this.upcomingBoss,
     this.activeBossEffect,
+    this.dailyWinGemEarned = false,
   });
 
   bool get isGameOver => sessionStatus == 'lost';
@@ -210,6 +212,7 @@ class AnswerResult {
             ? BossEncounter.fromJson(j['upcomingBoss'] as Map<String, dynamic>)
             : null,
         activeBossEffect: j['activeBossEffect'] as String?,
+        dailyWinGemEarned: j['dailyWinGemEarned'] as bool? ?? false,
       );
 }
 

@@ -7,6 +7,7 @@ import '../../game/presentation/screens/quiz_screen.dart';
 import '../../game/providers/game_mode_configs_provider.dart';
 import '../../menu/presentation/menu_bottom_sheet.dart';
 import '../../profile/providers/profile_provider.dart';
+import '../providers/daily_reward_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -15,6 +16,35 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final catName = ref.watch(catNameProvider).valueOrNull ?? '';
     final profile = ref.watch(userProfileProvider).valueOrNull;
+
+    ref.listen(dailyLoginProvider, (_, next) {
+      next.whenData((result) {
+        if (!result.claimed) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.surface,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            content: Row(
+              children: [
+                const Text('🪙', style: TextStyle(fontSize: 20)),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Login diário!', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontSize: 13)),
+                    Text('+${result.nekocoinsClaimed} Nekocoins', style: const TextStyle(color: AppColors.amber, fontSize: 12)),
+                  ],
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        ref.invalidate(userProfileProvider);
+      });
+    });
 
     return Scaffold(
       backgroundColor: AppColors.background,
